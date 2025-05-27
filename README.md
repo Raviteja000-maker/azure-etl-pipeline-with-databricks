@@ -122,4 +122,74 @@ Azure Data Factory pipeline handles both CSV and SQL ingestion:
 
 ## 📊 Next Step
 
-Proceed to the **Data Transformation** step using **Azure Databricks**.
+## 🔄 Enhancing Pipeline with Dynamic JSON via Lookup (GitHub)
+
+To improve modularity and make your pipeline **easier to maintain**, you've removed the hardcoded JSON from the parameter input and replaced it with a **dynamic Lookup** pointing to a JSON file hosted on GitHub.
+
+### ❌ Why Not Parameterize JSON Inline?
+
+Initially, the pipeline used a static JSON inside the ForEach parameter array:
+
+```json
+[
+  {
+    "csv_relative_url": "olist_orders_dataset.csv",
+    "file_name": "olist_orders_dataset.csv"
+  },
+  ...
+]
+```
+
+But this method is:
+
+* Not scalable when new files are added
+* Hard to maintain
+* Requires code changes to update input definitions
+
+---
+
+### ✅ Using Lookup + GitHub JSON
+
+Instead of inline JSON, you now:
+
+1. **Host a JSON file on GitHub**
+   Example: `https://raw.githubusercontent.com/Raviteja000-maker/azure-etl-pipeline-with-databricks/refs/json_file_path.json`
+
+2. **Create a new Dataset (HTTP – JSON)**
+
+   * Linked to GitHub via HTTP
+   * Authentication: Anonymous
+   * Used in a Lookup Activity
+
+3. **Use Lookup to feed ForEach input**
+
+   * In `ForEach > Settings > Items`, set:
+
+     ```
+     @activity('LookForeachInput').output.value
+     ```
+
+4. ✅ Now your pipeline automatically picks up new files defined in the GitHub JSON.
+
+---
+
+### 🔁 Updated Pipeline Flow
+
+```text
+Lookup (GitHub JSON)
+     ↓
+ForEach (Loop over GitHub CSVs)
+     ↓
+Copy Activity
+```
+
+* `olist_order_payments.csv` from **Clever Cloud MySQL** still uses a direct copy.
+* GitHub-based CSVs are now controlled via the JSON lookup.
+
+---
+
+### 🌐 Benefits of This Approach
+
+* 🔧 **Easier to update** – no pipeline redeploys for file changes
+* 📁 **Clean separation** between pipeline logic and metadata
+* 🌍 **Remote configurability** via GitHub
