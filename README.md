@@ -11,6 +11,7 @@ All ingested data is stored in the **Bronze layer** of **ADLS Gen2** for further
 
 ## 📁 Folder Structure
 
+```bash
 olistsample/
 ├── bronze/
 │   ├── olist_customers_dataset.csv              (from GitHub HTTP)
@@ -21,8 +22,8 @@ olistsample/
 │   ├── olist_products_dataset.csv               (from GitHub HTTP)
 │   ├── olist_sellers_dataset.csv                (from GitHub HTTP)
 │   └── olist_order_payments.csv                 (from Clever Cloud SQL)
+```
 
----
 
 ## ✅ Ingestion Pipeline Overview
 
