@@ -193,3 +193,86 @@ Copy Activity
 * 🔧 **Easier to update** – no pipeline redeploys for file changes
 * 📁 **Clean separation** between pipeline logic and metadata
 * 🌍 **Remote configurability** via GitHub
+
+## 📊 Next Step
+
+# Databricks to ADLS Gen2 Access via Azure App Registration (OAuth2)
+
+Now we are going to enable secure access from Databricks to Azure Data Lake Storage Gen2 using OAuth 2.0 via Azure Active Directory App Registration.
+
+---
+
+## 1. Register an Application in Azure AD
+
+1. Go to **Azure Portal > Azure Active Directory > App registrations**.
+2. Click on **"New registration"**.
+3. Provide a name like `olist-app-registration-db-adls`.
+4. Choose **Supported account type** as `My organization only`.
+5. Click **Register**.
+
+---
+
+## 2. Create Client Secret
+
+1. Go to the newly created app.
+2. Navigate to **Certificates & secrets > Client secrets**.
+3. Click **"New client secret"**, set expiration, and click **Add**.
+4. **Copy and save** the secret value (not just the secret ID).
+
+---
+
+## 3. Assign RBAC Role on ADLS Gen2
+
+1. Go to the **Storage Account** (e.g., `olistecommstore`).
+2. Go to **Access Control (IAM) > Role Assignments**.
+3. Click **"+ Add > Add role assignment"**.
+4. Select Role: `Storage Blob Data Contributor`.
+5. In Members tab, assign access to:
+
+   * **App Registration** (search by name: `olist-app-registration-db-adls`).
+6. Click **Review + assign**.
+
+---
+
+## 4. Configure Spark in Databricks
+
+In your Databricks notebook, define the following variables and set Spark configurations:
+
+```python
+storage_account = "olistecommstore"
+application_id = "<Application (client) ID>"
+service_credential = "<Client Secret>"
+directory_id = "<Directory (tenant) ID>"
+
+spark.conf.set(f"fs.azure.account.auth.type.{storage_account}.dfs.core.windows.net", "OAuth")
+spark.conf.set(f"fs.azure.account.oauth.provider.type.{storage_account}.dfs.core.windows.net", \
+    "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
+spark.conf.set(f"fs.azure.account.oauth2.client.id.{storage_account}.dfs.core.windows.net", application_id)
+spark.conf.set(f"fs.azure.account.oauth2.client.secret.{storage_account}.dfs.core.windows.net", service_credential)
+spark.conf.set(f"fs.azure.account.oauth2.client.endpoint.{storage_account}.dfs.core.windows.net", \
+    f"https://login.microsoftonline.com/{directory_id}/oauth2/token")
+```
+
+---
+
+## 5. Access Data from ADLS Gen2
+
+```python
+file_path = "abfss://<container>@olistecommstore.dfs.core.windows.net/<folder>/<file>.csv"
+
+df = spark.read.format("csv") \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .load(file_path)
+
+display(df)
+```
+
+---
+
+By registering an Azure AD app and assigning it the necessary RBAC role, you can securely access ADLS Gen2 from Databricks using OAuth2 credentials without storing access keys.
+
+---
+
+**Note:** Ensure that the secret value, app ID, and tenant ID are stored securely in Azure Key Vault or Databricks secrets for production use.
+
