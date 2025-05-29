@@ -1,5 +1,9 @@
 # 🚀 Data Ingestion: Azure Data Factory + ADLS Gen2
 
+### 📊 Data Pipeline Overview
+
+![Pipeline Flow](DataIngestionSteps&screenshots/pipeline.png)
+
 This step focuses on ingesting raw data from two sources:
 
 1. 📦 **GitHub (HTTP CSV files)** — multiple files
@@ -355,5 +359,109 @@ This will write the data in partitioned files (e.g., `part-0000*`) into the Silv
 This silver data can now be used for analytical workloads, reporting, or further processing in a gold layer.
 
 ➡️ *Next step: Create external views in Synapse using OPENROWSET to query Parquet data directly.*
+
+## 🧾 Synapse Analytics Flow: External Table Creation from ADLS Gen2
+
+This guide outlines the complete process of querying and writing Parquet data from ADLS Gen2 using Azure Synapse Analytics. It covers schema creation, credentials, external sources, views, and writing results to another layer.
+
+---
+
+### ✅ Step 1: Set up File Format & Credential
+
+```sql
+CREATE EXTERNAL FILE FORMAT extfileformat 
+WITH (
+    FORMAT_TYPE = PARQUET,
+    DATA_COMPRESSION = 'org.apache.hadoop.io.compress.SnappyCodec'
+);
+
+CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'YourStrongPassword@123';
+
+CREATE DATABASE SCOPED CREDENTIAL synapse_identity
+WITH IDENTITY = 'Managed Identity';
+```
+
+---
+
+### 🔗 Step 2: Register ADLS Gen2 as External Data Source
+
+```sql
+CREATE EXTERNAL DATA SOURCE olist_adls
+WITH (
+    LOCATION = 'https://olistecommstore.dfs.core.windows.net/',
+    CREDENTIAL = synapse_identity
+);
+```
+
+---
+
+### 🏷 Step 3: Create Schema and View (Reading from Silver Layer)
+
+```sql
+CREATE SCHEMA gold;
+
+CREATE VIEW gold.final AS
+SELECT *
+FROM OPENROWSET(
+    BULK 'olist/Silver/',
+    DATA_SOURCE = 'olist_adls',
+    FORMAT = 'PARQUET'
+) AS result;
+```
+
+---
+
+### 📋 Step 4: Read from the View
+
+```sql
+SELECT * FROM gold.final;
+```
+
+---
+
+### 📂 Step 5: Create External Data Source for Gold Layer
+
+This is where you want to save enriched/processed results.
+
+```sql
+CREATE EXTERNAL DATA SOURCE goldlayer 
+WITH (
+    LOCATION = 'https://olistecommstore.dfs.core.windows.net/olist/Gold/',
+    CREDENTIAL = synapse_identity
+);
+```
+
+---
+
+### 🪄 Step 6: Write Output from Gold View to Final Table
+
+```sql
+CREATE EXTERNAL TABLE gold.finaltable 
+WITH (
+    LOCATION = 'finalServing',
+    DATA_SOURCE = goldlayer,
+    FILE_FORMAT = extfileformat
+)
+AS
+SELECT * FROM gold.final2;
+```
+
+Note: `gold.final2` must be another view or staging table, if you're referring to a transformed output or filtered results.
+
+---
+
+### 📌 Summary
+
+* Data is first queried from ADLS Gen2 (Silver path) using OPENROWSET.
+* That data is materialized as a View inside Synapse.
+* A new Data Source pointing to the Gold folder is created.
+* The final external table writes enriched/filtered view results into ADLS Gen2 (Gold).
+
+---
+
+### 🔗 Reference:
+
+[Microsoft Docs - CREATE EXTERNAL TABLE AS SELECT (CETAS)](https://learn.microsoft.com/en-us/azure/synapse-analytics/sql/develop-tables-cetas)
+
 
 
