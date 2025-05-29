@@ -276,3 +276,84 @@ By registering an Azure AD app and assigning it the necessary RBAC role, you can
 
 **Note:** Ensure that the secret value, app ID, and tenant ID are stored securely in Azure Key Vault or Databricks secrets for production use.
 
+## 🔄 Data Transformation & Enrichment in Databricks (Post Ingestion)
+
+After ingesting data from multiple sources (HTTP API, SQL DB) into **Azure Data Lake Storage Gen2 (Bronze Layer)**, we proceed with transformation, enrichment, and writing to the **Silver Layer** using Databricks.
+
+---
+
+### 📥 Step 1: Read Raw Data from ADLS Gen2 (Bronze Layer)
+
+We use the `abfss://` protocol to read CSV files stored in the Bronze container:
+
+```python
+base_path = "abfss://olist@<storage_account>.dfs.core.windows.net/Bronze/"
+orders_df = spark.read.format("csv").option("header", "true").load(base_path + "olist_orders_dataset.csv")
+payments_df = spark.read.format("csv").option("header", "true").load(base_path + "olist_order_payments_dataset.csv")
+... (read all datasets similarly)
+```
+
+---
+
+### 🛠 Step 2: Transform and Join Data
+
+Once the raw data is ingested from various sources like HTTP endpoints, SQL Server, and MongoDB, we move on to processing and transformation within Databricks. This stage ensures that the data is clean, enriched, and analytics-ready before being written to the Silver layer.
+
+Key transformation tasks include:
+
+* **Data Cleaning**: Identify and handle missing or null values across datasets to maintain integrity.
+* **Type Casting**: Convert string columns representing dates or timestamps into appropriate datetime formats.
+* **Column Standardization**: Rename or standardize column names for consistency across datasets.
+* **Joins**: Combine multiple datasets (orders, payments, customers, products, sellers) using common keys like `order_id`, `customer_id`, and `product_id`.
+* **Enrichment**: Merge additional metadata or translated fields from MongoDB into the primary datasets.
+* **Basic Validation**: Perform sanity checks on joined data (row counts, duplicates, schema alignment).
+
+After these transformations, the curated data is saved in **Parquet format** under the **Silver layer** in Azure Data Lake Storage Gen2 (ADLS Gen2), ready for efficient querying and downstream analytics.
+
+### 🌍 Step 3: Enrich with MongoDB (Product Category Translation)
+
+We fetch translated category names from a MongoDB collection using `pymongo`:
+
+```python
+from pymongo import MongoClient
+import pandas as pd
+
+uri = "mongodb://<user>:<password>@<host>:27018/<database>"
+client = MongoClient(uri)
+db = client["<database>"]
+collection = db["product_category_translations"]
+translations_df = pd.DataFrame(list(collection.find()))
+```
+
+Convert to Spark DataFrame and join:
+
+```python
+translations_df["_id"] = translations_df["_id"].astype(str)
+translations_spark_df = spark.createDataFrame(translations_df)
+final_df = final_df.join(translations_spark_df, "product_category_name", "left")
+```
+
+---
+
+### 📦 Step 4: Write Enriched Data to ADLS Gen2 (Silver Layer)
+
+We write the resulting enriched dataset in Parquet format for optimized storage and querying:
+
+```python
+final_df.write.mode("overwrite").parquet("abfss://olist@<storage_account>.dfs.core.windows.net/Silver/")
+```
+
+This will write the data in partitioned files (e.g., `part-0000*`) into the Silver container.
+
+---
+
+*  Raw data is read from ADLS Gen2 (Bronze).
+*  Multiple datasets are joined in Spark.
+*  Translation enrichment from MongoDB is added.
+*  Final enriched data is written as **Parquet** files to the **Silver** layer in ADLS Gen2.
+
+This silver data can now be used for analytical workloads, reporting, or further processing in a gold layer.
+
+➡️ *Next step: Create external views in Synapse using OPENROWSET to query Parquet data directly.*
+
+
