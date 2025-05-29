@@ -400,13 +400,14 @@ WITH (
 ```sql
 CREATE SCHEMA gold;
 
-CREATE VIEW gold.final AS
+CREATE VIEW gold.final2 AS
 SELECT *
 FROM OPENROWSET(
     BULK 'olist/Silver/',
     DATA_SOURCE = 'olist_adls',
     FORMAT = 'PARQUET'
-) AS result;
+) AS result
+WHERE order_status='delivered'
 ```
 
 ---
