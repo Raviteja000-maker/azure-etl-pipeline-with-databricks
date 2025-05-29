@@ -415,7 +415,7 @@ WHERE order_status='delivered'
 ### 📋 Step 4: Read from the View
 
 ```sql
-SELECT * FROM gold.final;
+SELECT * FROM gold.final2;
 ```
 
 ---
