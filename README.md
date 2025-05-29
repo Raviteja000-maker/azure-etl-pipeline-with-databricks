@@ -2,7 +2,7 @@
 
 ### 📊 Data Pipeline Overview
 
-![Pipeline Flow](DataIngestionSteps&screenshots/pipeline.png)
+![Pipeline Flow](ProjectFlowSteps/pipeline.png)
 
 This step focuses on ingesting raw data from two sources:
 
